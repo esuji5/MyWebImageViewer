@@ -19,10 +19,10 @@ async function autoScroll() {
     let noChangeCount = 0;
     let lastTimestamp = null;
     const config = {
-      scrollSpeed: 2000, // 1秒あたりのスクロール量(px)
-      bottomWait: 100, // 最下部での待機時間(ms)
-      finalWait: 300, // 完了後の待機時間(ms)
-      noChangeLimit: 1, // 高さ不変を検知する回数
+      scrollSpeed: 2000,
+      bottomWait: 100,
+      finalWait: 300,
+      noChangeLimit: 1,
     };
 
     const progressBar = document.createElement("div");
@@ -85,17 +85,13 @@ async function autoScroll() {
       let maxScroll = getMaxScroll();
       let currentScroll = window.scrollY;
 
-      // 高さの変化を確認
       if (currentScroll >= maxScroll - 10) {
-        // 誤差を考慮
         if (Math.abs(maxScroll - previousHeight) < 10) {
-          // 誤差を考慮
           noChangeCount++;
           if (noChangeCount >= config.noChangeLimit) {
             loadingText.textContent = "読み込み完了を確認中...";
             progressIndicator.style.width = "100%";
 
-            // 最後のスクロールを確実に
             window.scrollTo(0, maxScroll);
 
             setTimeout(() => {
@@ -111,20 +107,17 @@ async function autoScroll() {
           previousHeight = maxScroll;
         }
 
-        // 最下部で待機後、次のスクロールを開始
         setTimeout(() => {
-          lastTimestamp = null; // リセット
+          lastTimestamp = null;
           requestAnimationFrame(scroll);
         }, config.bottomWait);
         return;
       }
 
-      // スクロール量を計算（一定速度）
       const scrollAmount = (config.scrollSpeed * elapsed) / 1000;
       const newPosition = Math.min(currentScroll + scrollAmount, maxScroll);
       window.scrollTo(0, newPosition);
 
-      // プログレスバーの更新
       const progress = (newPosition / maxScroll) * 90;
       progressIndicator.style.width = progress + "%";
 
@@ -138,12 +131,14 @@ async function autoScroll() {
 function findMangaImages(minWidth = 300, minHeight = 300) {
   const uniqueUrls = new Set();
 
-  // Twitter/x.comの場合の特別な処理
-  if (window.location.hostname.includes("x.com") || 
-      window.location.hostname.includes("twitter.com")) {
-    if (typeof collectTwitterImages === 'function') {
+  if (
+    window.location.hostname.includes("x.com") ||
+    window.location.hostname.includes("twitter.com")
+  ) {
+    if (typeof collectTwitterImages === "function") {
       const twitterImageUrls = collectTwitterImages();
-      return twitterImageUrls.map(url => {
+      console.log("Twitter images found:", twitterImageUrls.length);
+      return twitterImageUrls.map((url) => {
         const img = new Image();
         img.src = url;
         return img;
@@ -197,12 +192,24 @@ function findMangaImages(minWidth = 300, minHeight = 300) {
 async function startViewer(options = {}) {
   console.log("StartViewer called with options:", options);
   try {
-    if (hasLazyLoadImages()) {
-      console.log("Lazy loading detected. Starting auto-scroll...");
-      await autoScroll();
+    // TwitterのURLかどうかを確認
+    const isTwitter = 
+      window.location.hostname.includes("x.com") ||
+      window.location.hostname.includes("twitter.com");
+
+    // scrollToImageアクションの場合はスクロールをスキップ
+    if (!options.skipScroll) {
+      if (isTwitter) {
+        if (typeof twitterAutoScroll === "function") {
+          console.log("Using Twitter-specific scroll logic");
+          await twitterAutoScroll();
+        }
+      } else if (hasLazyLoadImages()) {
+        console.log("Lazy loading detected. Starting auto-scroll...");
+        await autoScroll();
+      }
     }
 
-    // デフォルト値をtrueに変更
     let rightToLeft = true;
     let doublePage = true;
 
@@ -212,8 +219,7 @@ async function startViewer(options = {}) {
         "doublePage",
       ]);
       if (result) {
-        rightToLeft =
-          result.rightToLeft !== false ? true : false;
+        rightToLeft = result.rightToLeft !== false ? true : false;
         doublePage = result.doublePage !== false ? true : false;
       }
     }
@@ -241,9 +247,14 @@ async function startViewer(options = {}) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log("Message received:", request);
   if (request.action === "startViewer" || request.action === "toggle-viewer") {
-    console.log("Starting viewer...");
-    startViewer(request);
-    sendResponse({}); // 即座にレスポンスを返す
+    // scrollToImageアクションの場合はスクロールをスキップするオプションを追加
+    const options = {
+      ...request,
+      skipScroll: request.action === "scrollToImage"
+    };
+    console.log("Starting viewer with options:", options);
+    startViewer(options);
+    sendResponse({});
   }
-  return true; // 非同期レスポンスを許可
+  return false;
 });

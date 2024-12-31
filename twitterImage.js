@@ -1,3 +1,5 @@
+let collectedTwitterImages = new Set();
+
 async function twitterAutoScroll() {
   const scrollStep = window.innerHeight * 2;
   const scrollDelay = 500;
@@ -26,34 +28,116 @@ async function twitterAutoScroll() {
   progressBar.appendChild(progressIndicator);
   document.body.appendChild(progressBar);
 
-  let initialTweetCount = document.querySelectorAll('article').length;
-  let maxTweetCount = initialTweetCount;
+  collectedTwitterImages = new Set();
+
+  let originalAuthor = null;
+  const firstTweet = document.querySelector('article');
+  if (firstTweet) {
+    const authorLink = firstTweet.querySelector('a[href*="/status/"]');
+    if (authorLink) {
+      const match = authorLink.href.match(/(?:twitter\.com|x\.com)\/([^/]+)/);
+      originalAuthor = match ? match[1] : null;
+    }
+  }
+
+  if (!originalAuthor) {
+    progressBar.remove();
+    return;
+  }
+
+  function collectCurrentImages() {
+    const imageSelectors = [
+      'img[src*="https://pbs.twimg.com/media"]',
+      'img[src*="https://ton.twitter.com"]',
+      'div[aria-label*="Image"] img',
+      'div[data-testid="tweetPhoto"] img',
+      'img[alt*="Image"]',
+      '[data-testid="tweetPhoto"] img',
+      '[data-testid="card.layoutSmall.media"] img',
+      '[data-testid="card.layoutLarge.media"] img',
+      'a[href*="/photo/"] img'
+    ];
+
+    document.querySelectorAll('article').forEach(article => {
+      const authorLink = article.querySelector('a[href*="/status/"]');
+      if (!authorLink) return;
+
+      const match = authorLink.href.match(/(?:twitter\.com|x\.com)\/([^/]+)/);
+      const currentAuthor = match ? match[1] : null;
+      
+      if (currentAuthor !== originalAuthor) return;
+
+      article.querySelectorAll(imageSelectors.join(',')).forEach(img => {
+        const normalizedUrl = normalizeImageUrl(img.src);
+        if (normalizedUrl) {
+          collectedTwitterImages.add(normalizedUrl);
+        }
+      });
+
+      article.querySelectorAll('[aria-label]').forEach(el => {
+        if (el.ariaLabel?.includes('Image')) {
+          el.querySelectorAll('img').forEach(img => {
+            const normalizedUrl = normalizeImageUrl(img.src);
+            if (normalizedUrl) {
+              collectedTwitterImages.add(normalizedUrl);
+            }
+          });
+        }
+      });
+    });
+  }
 
   return new Promise((resolve) => {
+    let finalScrollDone = false;
+
     const scroll = async () => {
       const currentPosition = window.scrollY;
-      const currentTweetCount = document.querySelectorAll('article').length;
       const timePassed = Date.now() - startTime;
 
-      const progress = Math.min((currentTweetCount / maxTweetCount) * 100, 100);
+      collectCurrentImages();
+      const progress = Math.min((collectedTwitterImages.size / 10) * 100, 100);
       progressIndicator.style.width = `${progress}%`;
 
-      if (currentPosition === lastScrollPosition) {
-        noChangeCount++;
-      } else {
-        noChangeCount = 0;
-        if (currentTweetCount > maxTweetCount) {
-          maxTweetCount = currentTweetCount;
+      let foundDifferentAuthor = false;
+      document.querySelectorAll('article').forEach(article => {
+        const authorLink = article.querySelector('a[href*="/status/"]');
+        if (authorLink) {
+          const match = authorLink.href.match(/(?:twitter\.com|x\.com)\/([^/]+)/);
+          const currentAuthor = match ? match[1] : null;
+          if (currentAuthor && currentAuthor !== originalAuthor) {
+            foundDifferentAuthor = true;
+          }
         }
-      }
+      });
 
       const shouldStop = 
-        noChangeCount >= 3 ||
+        foundDifferentAuthor ||
+        currentPosition === lastScrollPosition ||
         timePassed >= maxWaitTime ||
         currentPosition >= document.documentElement.scrollHeight - window.innerHeight;
 
       if (shouldStop) {
-        console.log(`Scroll completed. Tweets found: ${currentTweetCount}`);
+        if (!finalScrollDone) {
+          // 最終スクロールをまだ行っていない場合、もう一度だけスクロール
+          finalScrollDone = true;
+          lastScrollPosition = currentPosition;
+          window.scrollBy({
+            top: scrollStep,
+            behavior: 'auto'
+          });
+          
+          // 最後の画像収集のための待機
+          await new Promise(r => setTimeout(r, scrollDelay * 2));
+          collectCurrentImages();  // 最後の画像収集
+
+          console.log(`Scroll completed. Images found: ${collectedTwitterImages.size}`);
+          progressBar.remove();
+          window.scrollTo(0, 0);
+          resolve();
+          return;
+        }
+        
+        console.log(`Scroll completed. Images found: ${collectedTwitterImages.size}`);
         progressBar.remove();
         window.scrollTo(0, 0);
         resolve();
@@ -91,53 +175,7 @@ function normalizeImageUrl(url) {
 }
 
 function collectTwitterImages() {
-  const imageUrls = new Set();
-  const imageSelectors = [
-    'img[src*="https://pbs.twimg.com/media"]',
-    'img[src*="https://ton.twitter.com"]',
-    'div[aria-label*="Image"] img',
-    'div[data-testid="tweetPhoto"] img',
-    'img[alt*="Image"]',
-    '[data-testid="tweetPhoto"] img',
-    '[data-testid="card.layoutSmall.media"] img',
-    '[data-testid="card.layoutLarge.media"] img',
-    'a[href*="/photo/"] img'
-  ];
-  
-  // 最初のツイートを特別に処理
-  const firstTweet = document.querySelector('article');
-  if (firstTweet) {
-    // 通常の画像セレクタでの検索
-    firstTweet.querySelectorAll(imageSelectors.join(',')).forEach(img => {
-      const normalizedUrl = normalizeImageUrl(img.src);
-      if (normalizedUrl) imageUrls.add(normalizedUrl);
-    });
-
-    // aria-label属性を持つ要素内の画像を検索
-    firstTweet.querySelectorAll('[aria-label]').forEach(el => {
-      if (el.ariaLabel?.includes('Image')) {
-        el.querySelectorAll('img').forEach(img => {
-          const normalizedUrl = normalizeImageUrl(img.src);
-          if (normalizedUrl) imageUrls.add(normalizedUrl);
-        });
-      }
-    });
-  }
-
-  // 残りのツイートを処理
-  document.querySelectorAll('article').forEach(article => {
-    if (article === firstTweet) return;
-
-    // 通常の画像セレクタでの検索
-    article.querySelectorAll(imageSelectors.join(',')).forEach(img => {
-      const normalizedUrl = normalizeImageUrl(img.src);
-      if (normalizedUrl) imageUrls.add(normalizedUrl);
-    });
-  });
-
-  const result = Array.from(imageUrls);
-  console.log(`Collected ${result.length} unique images`);
-  return result;
+  return Array.from(collectedTwitterImages);
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -160,9 +198,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     document.body.appendChild(loadingDiv);
 
     twitterAutoScroll().then(() => {
-      const imageUrls = collectTwitterImages();
       loadingDiv.remove();
-
+      const imageUrls = collectTwitterImages();
+      console.log("Sending collected images:", imageUrls);
       chrome.runtime.sendMessage({
         action: "addImages",
         imageUrls: imageUrls,
