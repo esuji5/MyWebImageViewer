@@ -3,7 +3,7 @@
   "name": "Manga Viewer",
   "version": "1.1",
   "description": "View manga and comics in a convenient reader interface",
-  "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "permissions": ["activeTab", "scripting", "storage", "tabs", "commands"],
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "popup.html",
@@ -19,14 +19,19 @@
   "commands": {
     "toggle-viewer": {
       "suggested_key": {
-        "default": "Alt+V"
+        "default": "Alt+V",
+        "mac": "Alt+R"
       },
       "description": "Toggle manga viewer"
     }
   },
   "content_scripts": [
     {
-      "matches": ["*://*.x.com/*", "*://*.twitter.com/*", "*://*.pro.twitter.com/*"],
+      "matches": [
+        "*://*.x.com/*",
+        "*://*.twitter.com/*",
+        "*://*.pro.twitter.com/*"
+      ],
       "js": ["content.js", "twitterImage.js", "viewer.js"],
       "css": ["viewer.css"]
     },

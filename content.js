@@ -245,5 +245,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     startViewer(request);
     sendResponse({}); // 即座にレスポンスを返す
   }
-  return false; // 非同期レスポンスは使用しない
+  return true; // 非同期レスポンスを許可
 });
