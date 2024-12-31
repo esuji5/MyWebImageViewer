@@ -1,180 +1,219 @@
 let collectedTwitterImages = new Set();
 
 async function twitterAutoScroll() {
-  const scrollStep = window.innerHeight * 2;
-  const scrollDelay = 500;
-  const maxWaitTime = 60000;
-  let lastScrollPosition = 0;
-  let noChangeCount = 0;
-  let startTime = Date.now();
+  try {
+    const scrollStep = window.innerHeight * 2;
+    const scrollDelay = 500;
+    const maxWaitTime = 60000;
+    let lastScrollPosition = 0;
+    let noChangeCount = 0;
+    let startTime = Date.now();
 
-  const progressBar = document.createElement("div");
-  progressBar.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 4px;
-    background: rgba(0, 0, 0, 0.1);
-    z-index: 999999;
-  `;
-  const progressIndicator = document.createElement("div");
-  progressIndicator.style.cssText = `
-    width: 0%;
-    height: 100%;
-    background: #1DA1F2;
-    transition: width 0.3s;
-  `;
-  progressBar.appendChild(progressIndicator);
-  document.body.appendChild(progressBar);
+    // UI要素の作成と追加
+    const progressBar = document.createElement("div");
+    progressBar.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: rgba(0, 0, 0, 0.1);
+      z-index: 999999;
+    `;
+    const progressIndicator = document.createElement("div");
+    progressIndicator.style.cssText = `
+      width: 0%;
+      height: 100%;
+      background: #1DA1F2;
+      transition: width 0.3s;
+    `;
+    progressBar.appendChild(progressIndicator);
+    document.body.appendChild(progressBar);
 
-  collectedTwitterImages = new Set();
+    // 画像コレクションの初期化
+    collectedTwitterImages = new Set();
 
-  let originalAuthor = null;
-  const firstTweet = document.querySelector('article');
-  if (firstTweet) {
-    const authorLink = firstTweet.querySelector('a[href*="/status/"]');
-    if (authorLink) {
-      const match = authorLink.href.match(/(?:twitter\.com|x\.com)\/([^/]+)/);
-      originalAuthor = match ? match[1] : null;
+    // 最初のツイートの投稿者を特定
+    const firstTweet = document.querySelector('article');
+    if (!firstTweet) {
+      throw new Error('ツイートが見つかりません。');
     }
-  }
 
-  if (!originalAuthor) {
-    progressBar.remove();
-    return;
-  }
+    const authorLink = firstTweet.querySelector('a[href*="/status/"]');
+    if (!authorLink) {
+      throw new Error('投稿者の情報が見つかりません。');
+    }
 
-  function collectCurrentImages() {
-    const imageSelectors = [
-      'img[src*="https://pbs.twimg.com/media"]',
-      'img[src*="https://ton.twitter.com"]',
-      'div[aria-label*="Image"] img',
-      'div[data-testid="tweetPhoto"] img',
-      'img[alt*="Image"]',
-      '[data-testid="tweetPhoto"] img',
-      '[data-testid="card.layoutSmall.media"] img',
-      '[data-testid="card.layoutLarge.media"] img',
-      'a[href*="/photo/"] img'
-    ];
+    const match = authorLink.href.match(/(?:twitter\.com|x\.com)\/([^/]+)/);
+    const originalAuthor = match ? match[1] : null;
+    if (!originalAuthor) {
+      throw new Error('投稿者のユーザー名を取得できません。');
+    }
 
-    document.querySelectorAll('article').forEach(article => {
-      const authorLink = article.querySelector('a[href*="/status/"]');
-      if (!authorLink) return;
+    console.log(`Original author: ${originalAuthor}`);
 
-      const match = authorLink.href.match(/(?:twitter\.com|x\.com)\/([^/]+)/);
-      const currentAuthor = match ? match[1] : null;
-      
-      if (currentAuthor !== originalAuthor) return;
+    function collectCurrentImages() {
+      try {
+        const imageSelectors = [
+          'img[src*="https://pbs.twimg.com/media"]',
+          'img[src*="https://ton.twitter.com"]',
+          'div[aria-label*="Image"] img',
+          'div[data-testid="tweetPhoto"] img',
+          'img[alt*="Image"]',
+          '[data-testid="tweetPhoto"] img',
+          '[data-testid="card.layoutSmall.media"] img',
+          '[data-testid="card.layoutLarge.media"] img',
+          'a[href*="/photo/"] img'
+        ];
 
-      article.querySelectorAll(imageSelectors.join(',')).forEach(img => {
-        const normalizedUrl = normalizeImageUrl(img.src);
-        if (normalizedUrl) {
-          collectedTwitterImages.add(normalizedUrl);
-        }
-      });
+        document.querySelectorAll('article').forEach(article => {
+          const authorLink = article.querySelector('a[href*="/status/"]');
+          if (!authorLink) return;
 
-      article.querySelectorAll('[aria-label]').forEach(el => {
-        if (el.ariaLabel?.includes('Image')) {
-          el.querySelectorAll('img').forEach(img => {
+          const match = authorLink.href.match(/(?:twitter\.com|x\.com)\/([^/]+)/);
+          const currentAuthor = match ? match[1] : null;
+          
+          if (currentAuthor !== originalAuthor) return;
+
+          article.querySelectorAll(imageSelectors.join(',')).forEach(img => {
             const normalizedUrl = normalizeImageUrl(img.src);
             if (normalizedUrl) {
               collectedTwitterImages.add(normalizedUrl);
             }
           });
-        }
-      });
-    });
-  }
 
-  return new Promise((resolve) => {
-    let finalScrollDone = false;
+          article.querySelectorAll('[aria-label]').forEach(el => {
+            if (el.ariaLabel?.includes('Image')) {
+              el.querySelectorAll('img').forEach(img => {
+                const normalizedUrl = normalizeImageUrl(img.src);
+                if (normalizedUrl) {
+                  collectedTwitterImages.add(normalizedUrl);
+                }
+              });
+            }
+          });
+        });
+      } catch (error) {
+        console.error('画像収集中にエラーが発生しました:', error);
+        throw error;
+      }
+    }
 
-    const scroll = async () => {
-      const currentPosition = window.scrollY;
-      const timePassed = Date.now() - startTime;
+    return new Promise((resolve, reject) => {
+      let lastScrollAttemptCompleted = false;  // より明確な名前に変更
 
-      collectCurrentImages();
-      const progress = Math.min((collectedTwitterImages.size / 10) * 100, 100);
-      progressIndicator.style.width = `${progress}%`;
+      const scroll = async () => {
+        try {
+          const currentPosition = window.scrollY;
+          const timePassed = Date.now() - startTime;
 
-      let foundDifferentAuthor = false;
-      document.querySelectorAll('article').forEach(article => {
-        const authorLink = article.querySelector('a[href*="/status/"]');
-        if (authorLink) {
-          const match = authorLink.href.match(/(?:twitter\.com|x\.com)\/([^/]+)/);
-          const currentAuthor = match ? match[1] : null;
-          if (currentAuthor && currentAuthor !== originalAuthor) {
-            foundDifferentAuthor = true;
+          collectCurrentImages();
+          const progress = Math.min((collectedTwitterImages.size / 10) * 100, 100);
+          progressIndicator.style.width = `${progress}%`;
+
+          let foundDifferentAuthor = false;
+          document.querySelectorAll('article').forEach(article => {
+            const authorLink = article.querySelector('a[href*="/status/"]');
+            if (!authorLink) return;
+
+            const match = authorLink.href.match(/(?:twitter\.com|x\.com)\/([^/]+)/);
+            const currentAuthor = match ? match[1] : null;
+            if (currentAuthor && currentAuthor !== originalAuthor) {
+              foundDifferentAuthor = true;
+              console.log(`Different author found: ${currentAuthor}`);
+            }
+          });
+
+          const shouldStop = 
+            foundDifferentAuthor ||
+            currentPosition === lastScrollPosition ||
+            timePassed >= maxWaitTime ||
+            currentPosition >= document.documentElement.scrollHeight - window.innerHeight;
+
+          if (shouldStop) {
+            if (!lastScrollAttemptCompleted) {
+              lastScrollAttemptCompleted = true;
+              lastScrollPosition = currentPosition;
+              window.scrollBy({
+                top: scrollStep,
+                behavior: 'auto'
+              });
+              
+              await new Promise(r => setTimeout(r, scrollDelay * 2));
+              collectCurrentImages();
+
+              console.log(`スクロール完了。${collectedTwitterImages.size}枚の画像を発見しました。`);
+              progressBar.remove();
+              window.scrollTo(0, 0);
+              resolve();
+              return;
+            }
+            
+            console.log(`スクロール完了。${collectedTwitterImages.size}枚の画像を発見しました。`);
+            progressBar.remove();
+            window.scrollTo(0, 0);
+            resolve();
+            return;
           }
-        }
-      });
 
-      const shouldStop = 
-        foundDifferentAuthor ||
-        currentPosition === lastScrollPosition ||
-        timePassed >= maxWaitTime ||
-        currentPosition >= document.documentElement.scrollHeight - window.innerHeight;
-
-      if (shouldStop) {
-        if (!finalScrollDone) {
-          // 最終スクロールをまだ行っていない場合、もう一度だけスクロール
-          finalScrollDone = true;
           lastScrollPosition = currentPosition;
           window.scrollBy({
             top: scrollStep,
             behavior: 'auto'
           });
-          
-          // 最後の画像収集のための待機
-          await new Promise(r => setTimeout(r, scrollDelay * 2));
-          collectCurrentImages();  // 最後の画像収集
 
-          console.log(`Scroll completed. Images found: ${collectedTwitterImages.size}`);
+          await new Promise(r => setTimeout(r, scrollDelay));
+          scroll();
+        } catch (error) {
+          console.error('スクロール処理中にエラーが発生しました:', error);
           progressBar.remove();
-          window.scrollTo(0, 0);
-          resolve();
-          return;
+          reject(error);
         }
-        
-        console.log(`Scroll completed. Images found: ${collectedTwitterImages.size}`);
-        progressBar.remove();
-        window.scrollTo(0, 0);
-        resolve();
-        return;
-      }
+      };
 
-      lastScrollPosition = currentPosition;
-      window.scrollBy({
-        top: scrollStep,
-        behavior: 'auto'
-      });
-
-      await new Promise(r => setTimeout(r, scrollDelay));
       scroll();
-    };
-
-    scroll();
-  });
+    });
+  } catch (error) {
+    console.error('Twitter画像収集中にエラーが発生しました:', error);
+    throw error;
+  }
 }
 
 function normalizeImageUrl(url) {
-  if (!url) return null;
-  if (url.includes('profile_images') || url.includes('_normal.')) return null;
-  
-  let imageUrl = url;
-  if (imageUrl.includes('&name=')) {
-    imageUrl = imageUrl.replace(/&name=\w+/, '&name=orig');
-  } else if (imageUrl.includes('?format=')) {
-    imageUrl = imageUrl.replace(/\?format=\w+/, '?format=png&name=orig');
-  } else if (!imageUrl.includes('name=orig')) {
-    imageUrl += imageUrl.includes('?') ? '&name=orig' : '?name=orig';
+  try {
+    if (!url) {
+      console.debug('URLが空です');
+      return null;
+    }
+
+    if (!(url.startsWith('http://') || url.startsWith('https://'))) {
+      console.debug('無効なURL形式です:', url);
+      return null;
+    }
+
+    if (url.includes('profile_images') || url.includes('_normal.')) {
+      console.debug('プロフィール画像をスキップします:', url);
+      return null;
+    }
+    
+    let imageUrl = url;
+    if (imageUrl.includes('&name=')) {
+      imageUrl = imageUrl.replace(/&name=\w+/, '&name=orig');
+    } else if (imageUrl.includes('?format=')) {
+      imageUrl = imageUrl.replace(/\?format=\w+/, '?format=png&name=orig');
+    } else if (!imageUrl.includes('name=orig')) {
+      imageUrl += imageUrl.includes('?') ? '&name=orig' : '?name=orig';
+    }
+    
+    return imageUrl;
+  } catch (error) {
+    console.error('URL正規化中にエラーが発生しました:', error);
+    return null;
   }
-  
-  return imageUrl;
 }
 
 function collectTwitterImages() {
+  console.log(`収集された画像数: ${collectedTwitterImages.size}`);
   return Array.from(collectedTwitterImages);
 }
 
@@ -197,33 +236,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     loadingDiv.textContent = "画像を収集中...";
     document.body.appendChild(loadingDiv);
 
-    twitterAutoScroll().then(() => {
-      loadingDiv.remove();
-      const imageUrls = collectTwitterImages();
-      console.log("Sending collected images:", imageUrls);
-      chrome.runtime.sendMessage({
-        action: "addImages",
-        imageUrls: imageUrls,
+    twitterAutoScroll()
+      .then(() => {
+        loadingDiv.remove();
+        const imageUrls = collectTwitterImages();
+        console.log("収集した画像を送信します:", imageUrls);
+        chrome.runtime.sendMessage({
+          action: "addImages",
+          imageUrls: imageUrls,
+        });
+      })
+      .catch(error => {
+        console.error('画像収集に失敗しました:', error);
+        loadingDiv.textContent = "画像の収集に失敗しました";
+        loadingDiv.style.background = "rgba(220, 53, 69, 0.9)"; // エラー時は赤色に
+        setTimeout(() => {
+          loadingDiv.remove();
+        }, 3000);
       });
-    });
   } else if (message.action === "scrollToImage") {
-    const images = document.querySelectorAll(
-      'img[src*="https://pbs.twimg.com/media"]'
-    );
-    let targetImage = null;
+    try {
+      const images = document.querySelectorAll(
+        'img[src*="https://pbs.twimg.com/media"]'
+      );
+      let targetImage = null;
 
-    for (const img of images) {
-      if (
-        img.src === message.imageUrl ||
-        img.src.replace(/&name=\w+/, '&name=orig') === message.imageUrl
-      ) {
-        targetImage = img;
-        break;
+      for (const img of images) {
+        if (
+          img.src === message.imageUrl ||
+          img.src.replace(/&name=\w+/, '&name=orig') === message.imageUrl
+        ) {
+          targetImage = img;
+          break;
+        }
       }
-    }
 
-    if (targetImage) {
-      targetImage.scrollIntoView({behavior: "smooth", block: "center"});
+      if (targetImage) {
+        targetImage.scrollIntoView({behavior: "smooth", block: "center"});
+      } else {
+        console.warn('指定された画像が見つかりません:', message.imageUrl);
+      }
+    } catch (error) {
+      console.error('画像へのスクロール中にエラーが発生しました:', error);
     }
   }
 });
