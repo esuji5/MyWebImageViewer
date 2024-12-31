@@ -1,42 +1,36 @@
-// ビューワーの状態を管理するクラス
-class ViewerState {
-  constructor(images, rightToLeft = true, doublePage = true) {
+window.ViewerState = class ViewerState {
+  constructor(images, closeCallback) {
     this.images = images;
-    this.rightToLeft = rightToLeft;
-    this.doublePage = doublePage;
+    this.closeCallback = closeCallback;
     this.currentPage = 0;
     this.subscribers = new Set();
     this.touchStartX = 0;
     this.isPortrait = window.matchMedia("(orientation: portrait)").matches;
-    this.urlTrackingEnabled = true;
     this.pageKey = window.location.href;
     
-    // 縦長の画像かどうかを判定
     this.isVertical = Array.from(images).some((img) => {
       const rect = img.getBoundingClientRect();
       return rect.height > rect.width * 1.3;
     });
 
-    // 2ページ表示の初期状態を設定
-    this.useDoublePage = !this.isPortrait && (this.isVertical || doublePage);
+    this.rightToLeft = window.viewerSettings.getSetting('rightToLeft');
+    this.useDoublePage = !this.isPortrait && (this.isVertical || window.viewerSettings.getSetting('doublePage'));
+    this.urlTrackingEnabled = window.viewerSettings.getSetting('urlTrackingEnabled');
+    this.rememberPosition = window.viewerSettings.getSetting('rememberPosition');
 
-    // 画面の向きの変更を監視
     this.orientationChangeHandler = this.handleOrientationChange.bind(this);
     window.matchMedia("(orientation: portrait)").addListener(this.orientationChangeHandler);
   }
 
-  // 状態変更通知の購読
   subscribe(callback) {
     this.subscribers.add(callback);
     return () => this.subscribers.delete(callback);
   }
 
-  // 状態変更を通知
   notify() {
     this.subscribers.forEach(callback => callback(this.getState()));
   }
 
-  // 現在の状態を取得
   getState() {
     return {
       currentPage: this.currentPage,
@@ -48,7 +42,6 @@ class ViewerState {
     };
   }
 
-  // ページ送り
   nextPage() {
     if (this.currentPage < this.images.length - 1) {
       this.currentPage += this.useDoublePage ? 2 : 1;
@@ -60,7 +53,6 @@ class ViewerState {
     }
   }
 
-  // ページ戻り
   prevPage() {
     if (this.currentPage > 0) {
       this.currentPage -= this.useDoublePage ? 2 : 1;
@@ -72,16 +64,15 @@ class ViewerState {
     }
   }
 
-  // タッチ開始位置を記録
   setTouchStart(x) {
     this.touchStartX = x;
   }
 
-  // タッチ操作によるページ移動
   handleTouchEnd(endX) {
     const diff = endX - this.touchStartX;
+    const threshold = 50;
 
-    if (Math.abs(diff) > 50) {
+    if (Math.abs(diff) > threshold) {
       if (diff > 0) {
         if (!this.rightToLeft) this.prevPage();
         else this.nextPage();
@@ -92,18 +83,16 @@ class ViewerState {
     }
   }
 
-  // 画面の向きの変更を処理
   handleOrientationChange(e) {
     this.isPortrait = e.matches;
     if (this.isPortrait) {
       this.useDoublePage = false;
     } else {
-      this.useDoublePage = this.isVertical || this.doublePage;
+      this.useDoublePage = this.isVertical || window.viewerSettings.getSetting('doublePage');
     }
     this.notify();
   }
 
-  // 表示モードの切り替え
   toggleDisplayMode() {
     if (!this.isPortrait) {
       this.useDoublePage = !this.useDoublePage;
@@ -111,43 +100,61 @@ class ViewerState {
     }
   }
 
-  // キー操作の処理
   handleKeydown(e) {
-    if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") {
-      if (!this.rightToLeft) this.prevPage();
-      else this.nextPage();
-    } else if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") {
-      if (!this.rightToLeft) this.nextPage();
-      else this.prevPage();
-    } else if (e.key.toLowerCase() === "w" || e.key === "ArrowUp") {
+    if (e.key === "ArrowRight" || e.key === "d") {
+      if (!this.rightToLeft) {
+        this.nextPage();
+      } else {
+        this.prevPage();
+      }
+      e.preventDefault();
+    }
+    else if (e.key === "ArrowLeft" || e.key === "a") {
+      if (!this.rightToLeft) {
+        this.prevPage();
+      } else {
+        this.nextPage();
+      }
+      e.preventDefault();
+    }
+    else if (e.key === "ArrowUp" || e.key === "w") {
       this.nextPage();
-    } else if (e.key.toLowerCase() === "s" || e.key === "ArrowDown") {
+      e.preventDefault();
+    }
+    else if (e.key === "ArrowDown" || e.key === "s") {
       this.toggleDisplayMode();
+      e.preventDefault();
+    }
+    else if (e.key === "Escape") {
+      if (this.closeCallback) {
+        this.closeCallback();
+      }
+      e.preventDefault();
     }
   }
 
-  // 進捗の保存
   async saveProgress() {
-    if (this.urlTrackingEnabled && typeof chrome !== "undefined" && chrome.storage) {
+    if (this.urlTrackingEnabled && this.rememberPosition) {
       try {
-        await chrome.storage.local.set({ [this.pageKey]: this.currentPage });
+        await chrome.storage.local.set({
+          [`progress_${this.pageKey}`]: {
+            page: this.currentPage,
+            timestamp: Date.now()
+          }
+        });
       } catch (error) {
         console.warn("Failed to save progress:", error);
       }
     }
   }
 
-  // 進捗の読み込み
   async loadProgress() {
-    if (typeof chrome !== "undefined" && chrome.storage) {
+    if (this.urlTrackingEnabled && this.rememberPosition) {
       try {
-        const result = await chrome.storage.local.get([
-          this.pageKey,
-          'urlTrackingEnabled'
-        ]);
-        this.urlTrackingEnabled = result.urlTrackingEnabled !== false;
-        if (this.urlTrackingEnabled && result[this.pageKey] !== undefined) {
-          this.currentPage = result[this.pageKey];
+        const result = await chrome.storage.local.get(`progress_${this.pageKey}`);
+        const progress = result[`progress_${this.pageKey}`];
+        if (progress && progress.page !== undefined) {
+          this.currentPage = progress.page;
           this.notify();
         }
       } catch (error) {
@@ -156,27 +163,25 @@ class ViewerState {
     }
   }
 
-  // クリーンアップ
   cleanup() {
-    window.matchMedia("(orientation: portrait)").removeListener(this.orientationChangeHandler);
+    if (this.orientationChangeHandler) {
+      window.matchMedia("(orientation: portrait)").removeListener(this.orientationChangeHandler);
+    }
     this.subscribers.clear();
   }
-}
+};
 
-function initializeViewer(images, rightToLeft = true, initialDoublePage = false) {
-  // 既存のビューワーを削除
+window.initializeViewer = function(images) {
   const existingViewer = document.getElementById('manga-viewer');
   if (existingViewer) {
     existingViewer.remove();
   }
 
-  // ナビゲーションボタンの取得
   const navButtons = document.querySelector('.viewerbtn');
   const prevLink = navButtons?.querySelector('.viewerbtn_toBack a')?.href;
   const nextLink = navButtons?.querySelector('.viewerbtn_toNext a')?.href;
   const topLink = navButtons?.querySelector('.viewerbtn_toTop a')?.href;
 
-  // ビューワーのDOM構造を作成
   const viewer = document.createElement("div");
   viewer.id = "manga-viewer";
   viewer.innerHTML = `
@@ -195,20 +200,31 @@ function initializeViewer(images, rightToLeft = true, initialDoublePage = false)
   `;
   document.body.appendChild(viewer);
 
-  // DOMエレメントの取得
   const container = viewer.querySelector(".viewer-container");
   const pageInfo = viewer.querySelector("#page-info");
   const closeButton = viewer.querySelector("#close-viewer");
   const prevButton = viewer.querySelector("#prev-page");
   const nextButton = viewer.querySelector("#next-page");
 
-  // ViewerStateのインスタンス化
-  const state = new ViewerState(images, rightToLeft, initialDoublePage);
+  function closeViewer() {
+    cleanup();
+    if (document.body.contains(viewer)) {
+      document.body.removeChild(viewer);
+    }
+    const currentImage = images[state.currentPage];
+    const originalImage = Array.from(document.images).find(
+      (img) => img.src === currentImage.src
+    );
+    if (originalImage) {
+      originalImage.scrollIntoView({ behavior: "smooth" });
+    }
+  }
 
-  // 表示の更新
+  const state = new window.ViewerState(images, closeViewer);
+
   function updateDisplay(currentState) {
     container.innerHTML = "";
-    const { currentPage, totalPages } = currentState;
+    const { currentPage, totalPages, rightToLeft } = currentState;
 
     if (state.useDoublePage && currentPage < images.length - 1) {
       container.classList.remove("single-page");
@@ -253,29 +269,14 @@ function initializeViewer(images, rightToLeft = true, initialDoublePage = false)
     }
   }
 
-  // イベントハンドラーの設定
   function cleanup() {
     closeButton.removeEventListener('click', closeViewer);
     prevButton.removeEventListener('click', () => state.prevPage());
     nextButton.removeEventListener('click', () => state.nextPage());
-    document.removeEventListener('keydown', (e) => state.handleKeydown(e));
+    document.removeEventListener('keydown', handleKeydown);
     container.removeEventListener('touchstart', handleTouchStart);
     container.removeEventListener('touchend', handleTouchEnd);
     state.cleanup();
-  }
-
-  function closeViewer() {
-    cleanup();
-    if (document.body.contains(viewer)) {
-      document.body.removeChild(viewer);
-    }
-    const currentImage = images[state.currentPage];
-    const originalImage = Array.from(document.images).find(
-      (img) => img.src === currentImage.src
-    );
-    if (originalImage) {
-      originalImage.scrollIntoView({ behavior: "smooth" });
-    }
   }
 
   function handleTouchStart(e) {
@@ -286,18 +287,18 @@ function initializeViewer(images, rightToLeft = true, initialDoublePage = false)
     state.handleTouchEnd(e.changedTouches[0].clientX);
   }
 
-  // イベントリスナーの設定
+  function handleKeydown(e) {
+    state.handleKeydown(e);
+  }
+
   closeButton.addEventListener('click', closeViewer);
   prevButton.addEventListener('click', () => state.prevPage());
   nextButton.addEventListener('click', () => state.nextPage());
-  document.addEventListener('keydown', (e) => state.handleKeydown(e));
+  document.addEventListener('keydown', handleKeydown);
   container.addEventListener('touchstart', handleTouchStart);
   container.addEventListener('touchend', handleTouchEnd);
 
-  // 状態変更の購読
   state.subscribe(updateDisplay);
-
-  // 初期表示
   state.loadProgress().then(() => {
     updateDisplay(state.getState());
   });
@@ -306,4 +307,4 @@ function initializeViewer(images, rightToLeft = true, initialDoublePage = false)
     cleanup,
     closeViewer,
   };
-}
+};

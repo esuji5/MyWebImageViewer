@@ -32,12 +32,12 @@
         "*://*.twitter.com/*",
         "*://*.pro.twitter.com/*"
       ],
-      "js": ["content.js", "twitterImage.js", "viewer.js"],
+      "js": ["settings.js", "content.js", "twitterImage.js", "viewer.js"],
       "css": ["viewer.css"]
     },
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js", "viewer.js"],
+      "js": ["settings.js", "content.js", "viewer.js"],
       "css": ["viewer.css"]
     }
   ]
