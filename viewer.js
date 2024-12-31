@@ -118,7 +118,13 @@ window.ViewerState = class ViewerState {
       e.preventDefault();
     }
     else if (e.key === "ArrowUp" || e.key === "w") {
-      this.nextPage();
+      // 見開きモードでも強制的に1ページ送る
+      this.currentPage += 1;
+      if (this.currentPage >= this.images.length) {
+        this.currentPage = this.images.length - 1;
+      }
+      this.saveProgress();
+      this.notify();
       e.preventDefault();
     }
     else if (e.key === "ArrowDown" || e.key === "s") {
