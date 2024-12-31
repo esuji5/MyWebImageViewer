@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+    <style>
+        body {
+            width: 300px;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <h5>Manga Viewer Settings</h5>
+    <div class="form-check form-switch mb-2">
+        <input class="form-check-input" type="checkbox" id="rightToLeft" checked>
+        <label class="form-check-label" for="rightToLeft">右開きモード</label>
+    </div>
+    <div class="form-check form-switch mb-2">
+        <input class="form-check-input" type="checkbox" id="doublePage">
+        <label class="form-check-label" for="doublePage">見開き表示</label>
+    </div>
+    <div class="form-check form-switch mb-2">
+        <input class="form-check-input" type="checkbox" id="urlTrackingEnabled" checked>
+        <label class="form-check-label" for="urlTrackingEnabled">URL毎にページを記録</label>
+    </div>
+    <div class="mb-2">
+        <label class="form-label">最小幅 (px):</label>
+        <input type="number" class="form-control" id="minWidth" value="300" min="0">
+    </div>
+    <div class="mb-2">
+        <label class="form-label">最小高さ (px):</label>
+        <input type="number" class="form-control" id="minHeight" value="400" min="0">
+    </div>
+    <button id="startViewer" class="btn btn-primary w-100">ビューワーを開く (Alt+V)</button>
+    <script src="popup.js"></script>
+</body>
+</html>

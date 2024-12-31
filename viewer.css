@@ -1,0 +1,107 @@
+#manga-viewer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    z-index: 999999;
+    display: flex;
+    flex-direction: column;
+}
+
+.viewer-controls {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    z-index: 1000000;
+}
+
+.chapter-nav {
+    display: flex;
+    gap: 15px;
+    position: absolute;
+    right: 80px;
+}
+
+.chapter-link {
+    color: white;
+    text-decoration: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+    font-size: 14px;
+}
+
+.chapter-link:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.viewer-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 60px 0 20px;
+    overflow: hidden;
+}
+
+.double-page-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0;
+    height: calc(100vh - 80px);
+    font-size: 0;
+}
+
+.double-page-container img {
+    display: block;
+    height: 100%;
+    width: auto;
+    margin: 0;
+    padding: 0;
+    object-fit: contain;
+}
+
+.viewer-container.single-page img {
+    display: block;
+    height: calc(100vh - 80px);
+    width: auto;
+    margin: 0;
+    padding: 0;
+    object-fit: contain;
+}
+
+.viewer-controls button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 5px 15px;
+}
+
+.viewer-controls button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+#close-viewer {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 20px;
+}
+
+body.is-viewer-active {
+    overflow: hidden;
+}
