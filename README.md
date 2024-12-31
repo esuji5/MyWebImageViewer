@@ -6,7 +6,6 @@ Chrome 拡張機能と Flask バックエンドを組み合わせた、快適な
 
 ## Features | 機能 aa
 
-- 📱 Responsive design for both desktop and mobile
 - 📖 Dual-page spread viewing mode (optimal for desktop)
 - 🔄 Configurable reading direction (right-to-left/left-to-right)
 - ⌨️ Comprehensive keyboard shortcuts
@@ -26,18 +25,7 @@ Chrome 拡張機能と Flask バックエンドを組み合わせた、快適な
 - `ESC`: Close viewer | ビューワーを閉じる
 - `Alt+V`: Open viewer | ビューワーを開く
 
-### Touch Controls | タッチ操作
-
-- Swipe left: Next page | 次のページ
-- Swipe right: Previous page | 前のページ
-
 ## Installation | インストール方法
-
-### Prerequisites | 前提条件
-
-- Python 3.x
-- Google Chrome browser
-- Node.js (for development)
 
 ### Chrome Extension Setup | Chrome 拡張機能のインストール
 
@@ -54,18 +42,6 @@ cd manga-viewer
 - Enable "Developer mode" | 「デベロッパーモード」をオン
 - Click "Load unpacked" | 「パッケージ化されていない拡張機能を読み込む」をクリック
 - Select the `extension` folder | `extension` フォルダを選択
-
-### Backend Setup | バックエンドの設定
-
-```bash
-# Install required packages | 必要なパッケージのインストール
-pip install flask pillow flask-cors
-
-# Start the server | サーバーの起動
-python main.py
-```
-
-The server will start at `http://localhost:5000` | サーバーは `http://localhost:5000` で起動します。
 
 ## Usage | 使用方法
 
@@ -85,56 +61,6 @@ The server will start at `http://localhost:5000` | サーバーは `http://local
   Traditional manga reading direction, pages flow right to left.
   日本の漫画向けの表示モード。ページめくりの方向が逆になります。
 
-## Development | 開発環境
-
-### Setup | セットアップ
-
-```bash
-# Install frontend dependencies | フロントエンド依存関係のインストール
-npm install
-
-# Install backend dependencies | バックエンド依存関係のインストール
-pip install -r requirements.txt
-
-# Start development server | 開発用サーバーの起動
-python main.py
-```
-
-### Generate Sample Images | サンプル画像の生成
-
-```bash
-python generate_manga_images.py
-```
-
-## Technical Stack | 技術仕様
-
-### Frontend
-
-- React.js for the viewer interface
-- TypeScript for type safety
-- Vite for development and building
-- Chrome Extension APIs
-
-### Backend
-
-- Flask (Python)
-- Pillow for image processing
-- Flask-CORS for cross-origin support
-
-### Features
-
-- Responsive design using CSS Grid and Flexbox
-- Dynamic image loading and caching
-- Touch event handling
-- Keyboard shortcut management
-- Automatic aspect ratio detection
-
-## Contributing | コントリビューション
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-プルリクエストを歓迎します！
-
 ## License | ライセンス
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-このプロジェクトは MIT ライセンスの下で公開されています。詳細は LICENSE ファイルをご覧ください。
+CC0
