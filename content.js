@@ -2,11 +2,11 @@ console.log("Content script loaded");
 
 // エラータイプの定義
 const ViewerError = {
-  LOAD_ERROR: 'LOAD_ERROR',
-  SCROLL_ERROR: 'SCROLL_ERROR',
-  STORAGE_ERROR: 'STORAGE_ERROR',
-  IMAGE_ERROR: 'IMAGE_ERROR',
-  INITIALIZATION_ERROR: 'INITIALIZATION_ERROR'
+  LOAD_ERROR: "LOAD_ERROR",
+  SCROLL_ERROR: "SCROLL_ERROR",
+  STORAGE_ERROR: "STORAGE_ERROR",
+  IMAGE_ERROR: "IMAGE_ERROR",
+  INITIALIZATION_ERROR: "INITIALIZATION_ERROR",
 };
 
 class ViewerException extends Error {
@@ -36,7 +36,7 @@ async function autoScroll() {
       let noChangeCount = 0;
       let lastTimestamp = null;
       const config = {
-        scrollSpeed: 2000,
+        scrollSpeed: 6000,
         bottomWait: 100,
         finalWait: 300,
         noChangeLimit: 1,
@@ -141,13 +141,23 @@ async function autoScroll() {
 
           requestAnimationFrame(scroll);
         } catch (error) {
-          reject(new ViewerException(ViewerError.SCROLL_ERROR, `スクロール中にエラーが発生しました: ${error.message}`));
+          reject(
+            new ViewerException(
+              ViewerError.SCROLL_ERROR,
+              `スクロール中にエラーが発生しました: ${error.message}`
+            )
+          );
         }
       }
 
       requestAnimationFrame(scroll);
     } catch (error) {
-      reject(new ViewerException(ViewerError.SCROLL_ERROR, `スクロールの初期化に失敗しました: ${error.message}`));
+      reject(
+        new ViewerException(
+          ViewerError.SCROLL_ERROR,
+          `スクロールの初期化に失敗しました: ${error.message}`
+        )
+      );
     }
   });
 }
@@ -164,7 +174,10 @@ function findMangaImages(minWidth = 300, minHeight = 300) {
         const twitterImageUrls = collectTwitterImages();
         console.log("Twitter images found:", twitterImageUrls.length);
         if (twitterImageUrls.length === 0) {
-          throw new ViewerException(ViewerError.IMAGE_ERROR, "Twitter画像が見つかりませんでした");
+          throw new ViewerException(
+            ViewerError.IMAGE_ERROR,
+            "Twitter画像が見つかりませんでした"
+          );
         }
         return twitterImageUrls.map((url) => {
           const img = new Image();
@@ -179,15 +192,22 @@ function findMangaImages(minWidth = 300, minHeight = 300) {
         document.getElementsByClassName("viewerFixedImage")
       );
       const filteredImages = images.filter((img) => {
-        if (img.src && !img.src.includes("spacer") && !uniqueUrls.has(img.src)) {
+        if (
+          img.src &&
+          !img.src.includes("spacer") &&
+          !uniqueUrls.has(img.src)
+        ) {
           uniqueUrls.add(img.src);
           return true;
         }
         return false;
       });
-      
+
       if (filteredImages.length === 0) {
-        throw new ViewerException(ViewerError.IMAGE_ERROR, "web-ace.jpで画像が見つかりませんでした");
+        throw new ViewerException(
+          ViewerError.IMAGE_ERROR,
+          "web-ace.jpで画像が見つかりませんでした"
+        );
       }
       return filteredImages;
     }
@@ -222,7 +242,10 @@ function findMangaImages(minWidth = 300, minHeight = 300) {
     });
 
     if (filteredImages.length === 0) {
-      throw new ViewerException(ViewerError.IMAGE_ERROR, "表示可能な画像が見つかりませんでした");
+      throw new ViewerException(
+        ViewerError.IMAGE_ERROR,
+        "表示可能な画像が見つかりませんでした"
+      );
     }
 
     return filteredImages;
@@ -230,14 +253,17 @@ function findMangaImages(minWidth = 300, minHeight = 300) {
     if (error instanceof ViewerException) {
       throw error;
     }
-    throw new ViewerException(ViewerError.IMAGE_ERROR, `画像の検索中にエラーが発生しました: ${error.message}`);
+    throw new ViewerException(
+      ViewerError.IMAGE_ERROR,
+      `画像の検索中にエラーが発生しました: ${error.message}`
+    );
   }
 }
 
 async function startViewer(options = {}) {
   console.log("StartViewer called with options:", options);
   try {
-    const isTwitter = 
+    const isTwitter =
       window.location.hostname.includes("x.com") ||
       window.location.hostname.includes("twitter.com");
 
@@ -248,7 +274,10 @@ async function startViewer(options = {}) {
           try {
             await twitterAutoScroll();
           } catch (error) {
-            throw new ViewerException(ViewerError.SCROLL_ERROR, `Twitter固有のスクロール処理に失敗しました: ${error.message}`);
+            throw new ViewerException(
+              ViewerError.SCROLL_ERROR,
+              `Twitter固有のスクロール処理に失敗しました: ${error.message}`
+            );
           }
         }
       } else if (hasLazyLoadImages()) {
@@ -259,7 +288,10 @@ async function startViewer(options = {}) {
           if (error instanceof ViewerException) {
             throw error;
           }
-          throw new ViewerException(ViewerError.SCROLL_ERROR, `遅延読み込み画像のスクロールに失敗しました: ${error.message}`);
+          throw new ViewerException(
+            ViewerError.SCROLL_ERROR,
+            `遅延読み込み画像のスクロールに失敗しました: ${error.message}`
+          );
         }
       }
     }
@@ -278,7 +310,10 @@ async function startViewer(options = {}) {
           doublePage = result.doublePage !== false;
         }
       } catch (error) {
-        throw new ViewerException(ViewerError.STORAGE_ERROR, `設定の読み込みに失敗しました: ${error.message}`);
+        throw new ViewerException(
+          ViewerError.STORAGE_ERROR,
+          `設定の読み込みに失敗しました: ${error.message}`
+        );
       }
     }
 
@@ -295,20 +330,27 @@ async function startViewer(options = {}) {
       try {
         initializeViewer(images, rightToLeft, doublePage);
       } catch (error) {
-        throw new ViewerException(ViewerError.INITIALIZATION_ERROR, `ビューワーの初期化に失敗しました: ${error.message}`);
+        throw new ViewerException(
+          ViewerError.INITIALIZATION_ERROR,
+          `ビューワーの初期化に失敗しました: ${error.message}`
+        );
       }
     } else {
-      throw new ViewerException(ViewerError.IMAGE_ERROR, "表示可能な画像が見つかりませんでした");
+      throw new ViewerException(
+        ViewerError.IMAGE_ERROR,
+        "表示可能な画像が見つかりませんでした"
+      );
     }
   } catch (error) {
-    const errorMessage = {
-      [ViewerError.LOAD_ERROR]: '画像の読み込みに失敗しました',
-      [ViewerError.SCROLL_ERROR]: 'ページのスクロールに失敗しました',
-      [ViewerError.STORAGE_ERROR]: '設定の読み込みに失敗しました',
-      [ViewerError.IMAGE_ERROR]: '画像の検索に失敗しました',
-      [ViewerError.INITIALIZATION_ERROR]: 'ビューワーの初期化に失敗しました'
-    }[error.code] || 'ビューワーの起動に失敗しました';
-    
+    const errorMessage =
+      {
+        [ViewerError.LOAD_ERROR]: "画像の読み込みに失敗しました",
+        [ViewerError.SCROLL_ERROR]: "ページのスクロールに失敗しました",
+        [ViewerError.STORAGE_ERROR]: "設定の読み込みに失敗しました",
+        [ViewerError.IMAGE_ERROR]: "画像の検索に失敗しました",
+        [ViewerError.INITIALIZATION_ERROR]: "ビューワーの初期化に失敗しました",
+      }[error.code] || "ビューワーの起動に失敗しました";
+
     console.error("Error starting viewer:", error);
     alert(`${errorMessage}\n詳細: ${error.message}`);
   }
@@ -319,7 +361,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "startViewer" || request.action === "toggle-viewer") {
     const options = {
       ...request,
-      skipScroll: request.action === "scrollToImage"
+      skipScroll: request.action === "scrollToImage",
     };
     console.log("Starting viewer with options:", options);
     startViewer(options);
