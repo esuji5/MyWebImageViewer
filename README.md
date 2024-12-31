@@ -1,6 +1,9 @@
 # My Web Image Viewer
 
-A Chrome extension for enhanced manga and image viewing, providing a seamless and customizable reading experience.
+以下のような、画像をコミック形式で読みたいところにビューワーを提供します。
+
+- 複数の画像がスレッドで並べられた Twitter/X
+- 画像をそのまま並べる系の Web サイト
 
 ## Features | 機能
 
@@ -73,11 +76,6 @@ cd MyWebImageViewer
   1. Chrome 拡張機能を再読み込み
   2. ブラウザを再起動
   3. 最新バージョンであることを確認
-
-## Supported Platforms | 対応プラットフォーム
-
-- Twitter/X
-- 一般的な Web サイト
 
 ## License | ライセンス
 
