@@ -1,102 +1,167 @@
-async function autoScroll() {
-  const scrollStep = window.innerHeight;
-  const scrollDelay = 1000; // 1秒ごとにスクロール
-  const maxScrollAttempts = 30; // 最大スクロール回数
-  let scrollAttempts = 0;
+async function twitterAutoScroll() {
+  const scrollStep = window.innerHeight * 2;
+  const scrollDelay = 500;
+  const maxWaitTime = 60000;
   let lastScrollPosition = 0;
+  let noChangeCount = 0;
+  let startTime = Date.now();
 
-  // 最初のツイートの投稿者のユーザー名を取得
-  const getFirstTweetAuthor = () => {
-    const firstArticle = document.querySelector("article");
-    if (!firstArticle) return null;
-    const userLink = firstArticle.querySelector('a[href*="/status/"]')?.href;
-    if (!userLink) return null;
-    const match = userLink.match(/(?:twitter\.com|x\.com)\/([^/]+)/);
-    return match ? match[1] : null;
-  };
+  const progressBar = document.createElement("div");
+  progressBar.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: rgba(0, 0, 0, 0.1);
+    z-index: 999999;
+  `;
+  const progressIndicator = document.createElement("div");
+  progressIndicator.style.cssText = `
+    width: 0%;
+    height: 100%;
+    background: #1DA1F2;
+    transition: width 0.3s;
+  `;
+  progressBar.appendChild(progressIndicator);
+  document.body.appendChild(progressBar);
 
-  const originalAuthor = getFirstTweetAuthor();
+  let initialTweetCount = document.querySelectorAll('article').length;
+  let maxTweetCount = initialTweetCount;
 
   return new Promise((resolve) => {
-    const scroll = () => {
+    const scroll = async () => {
       const currentPosition = window.scrollY;
+      const currentTweetCount = document.querySelectorAll('article').length;
+      const timePassed = Date.now() - startTime;
 
-      // スクロール位置が変わっていないか、最大回数に達した場合
-      if (
-        currentPosition === lastScrollPosition ||
-        scrollAttempts >= maxScrollAttempts
-      ) {
-        window.scrollTo(0, 0); // 先頭に戻る
-        resolve();
-        return;
+      const progress = Math.min((currentTweetCount / maxTweetCount) * 100, 100);
+      progressIndicator.style.width = `${progress}%`;
+
+      if (currentPosition === lastScrollPosition) {
+        noChangeCount++;
+      } else {
+        noChangeCount = 0;
+        if (currentTweetCount > maxTweetCount) {
+          maxTweetCount = currentTweetCount;
+        }
       }
 
-      // 現在表示されているツイートをチェック
-      const articles = document.querySelectorAll("article");
-      let shouldStop = false;
-
-      articles.forEach((article) => {
-        const userLink = article.querySelector('a[href*="/status/"]')?.href;
-        if (userLink) {
-          const match = userLink.match(/(?:twitter\.com|x\.com)\/([^/]+)/);
-          const currentAuthor = match ? match[1] : null;
-
-          // オリジナルの投稿者と異なるユーザーのツイートを見つけた場合
-          if (
-            currentAuthor &&
-            originalAuthor &&
-            currentAuthor !== originalAuthor
-          ) {
-            shouldStop = true;
-          }
-        }
-      });
+      const shouldStop = 
+        noChangeCount >= 3 ||
+        timePassed >= maxWaitTime ||
+        currentPosition >= document.documentElement.scrollHeight - window.innerHeight;
 
       if (shouldStop) {
-        window.scrollTo(0, 0); // 先頭に戻る
+        console.log(`Scroll completed. Tweets found: ${currentTweetCount}`);
+        progressBar.remove();
+        window.scrollTo(0, 0);
         resolve();
         return;
       }
 
       lastScrollPosition = currentPosition;
-      window.scrollBy(0, scrollStep);
-      scrollAttempts++;
-      setTimeout(scroll, scrollDelay);
+      window.scrollBy({
+        top: scrollStep,
+        behavior: 'auto'
+      });
+
+      await new Promise(r => setTimeout(r, scrollDelay));
+      scroll();
     };
 
-    if (originalAuthor) {
-      scroll();
-    } else {
-      resolve(); // 投稿者が見つからない場合は終了
-    }
+    scroll();
   });
+}
+
+function normalizeImageUrl(url) {
+  if (!url) return null;
+  if (url.includes('profile_images') || url.includes('_normal.')) return null;
+  
+  let imageUrl = url;
+  if (imageUrl.includes('&name=')) {
+    imageUrl = imageUrl.replace(/&name=\w+/, '&name=orig');
+  } else if (imageUrl.includes('?format=')) {
+    imageUrl = imageUrl.replace(/\?format=\w+/, '?format=png&name=orig');
+  } else if (!imageUrl.includes('name=orig')) {
+    imageUrl += imageUrl.includes('?') ? '&name=orig' : '?name=orig';
+  }
+  
+  return imageUrl;
 }
 
 function collectTwitterImages() {
-  const images = document.querySelectorAll(
-    'img[src*="https://pbs.twimg.com/media"]'
-  );
-  const imageUrls = new Set(); // 重複を避けるためにSetを使用
+  const imageUrls = new Set();
+  const imageSelectors = [
+    'img[src*="https://pbs.twimg.com/media"]',
+    'img[src*="https://ton.twitter.com"]',
+    'div[aria-label*="Image"] img',
+    'div[data-testid="tweetPhoto"] img',
+    'img[alt*="Image"]',
+    '[data-testid="tweetPhoto"] img',
+    '[data-testid="card.layoutSmall.media"] img',
+    '[data-testid="card.layoutLarge.media"] img',
+    'a[href*="/photo/"] img'
+  ];
+  
+  // 最初のツイートを特別に処理
+  const firstTweet = document.querySelector('article');
+  if (firstTweet) {
+    // 通常の画像セレクタでの検索
+    firstTweet.querySelectorAll(imageSelectors.join(',')).forEach(img => {
+      const normalizedUrl = normalizeImageUrl(img.src);
+      if (normalizedUrl) imageUrls.add(normalizedUrl);
+    });
 
-  images.forEach((image) => {
-    let imageUrl = image.src;
-    if (imageUrl.includes("&name=")) {
-      imageUrl = imageUrl.replace(/&name=\w+/, "&name=orig");
-    }
-    imageUrls.add(imageUrl);
+    // aria-label属性を持つ要素内の画像を検索
+    firstTweet.querySelectorAll('[aria-label]').forEach(el => {
+      if (el.ariaLabel?.includes('Image')) {
+        el.querySelectorAll('img').forEach(img => {
+          const normalizedUrl = normalizeImageUrl(img.src);
+          if (normalizedUrl) imageUrls.add(normalizedUrl);
+        });
+      }
+    });
+  }
+
+  // 残りのツイートを処理
+  document.querySelectorAll('article').forEach(article => {
+    if (article === firstTweet) return;
+
+    // 通常の画像セレクタでの検索
+    article.querySelectorAll(imageSelectors.join(',')).forEach(img => {
+      const normalizedUrl = normalizeImageUrl(img.src);
+      if (normalizedUrl) imageUrls.add(normalizedUrl);
+    });
   });
 
-  return Array.from(imageUrls);
+  const result = Array.from(imageUrls);
+  console.log(`Collected ${result.length} unique images`);
+  return result;
 }
 
-// メインのメッセージリスナー
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("content.js message:", message);
   if (message.action === "extractImages") {
-    // スクロールしてから画像を収集
-    autoScroll().then(() => {
+    const loadingDiv = document.createElement('div');
+    loadingDiv.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(29, 161, 242, 0.9);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 14px;
+      z-index: 999999;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    `;
+    loadingDiv.textContent = "画像を収集中...";
+    document.body.appendChild(loadingDiv);
+
+    twitterAutoScroll().then(() => {
       const imageUrls = collectTwitterImages();
-      console.log("Found Twitter images:", imageUrls);
+      loadingDiv.remove();
 
       chrome.runtime.sendMessage({
         action: "addImages",
@@ -104,7 +169,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     });
   } else if (message.action === "scrollToImage") {
-    // 指定された画像要素を探す
     const images = document.querySelectorAll(
       'img[src*="https://pbs.twimg.com/media"]'
     );
@@ -113,14 +177,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     for (const img of images) {
       if (
         img.src === message.imageUrl ||
-        img.src.replace(/&name=\w+/, "&name=orig") === message.imageUrl
+        img.src.replace(/&name=\w+/, '&name=orig') === message.imageUrl
       ) {
         targetImage = img;
         break;
       }
     }
 
-    // 見つかった画像まで自然にスクロール
     if (targetImage) {
       targetImage.scrollIntoView({behavior: "smooth", block: "center"});
     }
